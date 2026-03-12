@@ -1,6 +1,25 @@
-/* Styles for Private Chat Exporter */
+/* Styles for the export button */
+#private-md-export-btn {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10000;
+  padding: 10px 15px;
+  border: none;
+  border-radius: 8px;
+  background: #10a37f;
+  color: #fff;
+  cursor: pointer;
+  font-family: sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition:
+    transform 0.2s ease,
+    filter 0.2s ease;
+}
+
 #private-md-export-btn:hover {
   filter: brightness(1.1);
   transform: scale(1.05);
-  transition: all 0.2s ease;
 }
