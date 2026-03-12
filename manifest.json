@@ -1,8 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Private AI Chat Exporter",
-  "version": "1.0",
+  "version": "1.2",
   "description": "Exports ChatGPT and Gemini conversations safely and locally as Markdown (.md), with no cloud connection.",
+  "icons": {
+    "16": "assets/icon16.png",
+    "32": "assets/icon32.png",
+    "48": "assets/icon48.png",
+    "128": "assets/icon128.png"
+  },
   "content_scripts": [
     {
       "all_frames": false,
@@ -17,6 +23,10 @@
     }
   ],
   "action": {
+    "default_icon": {
+      "16": "assets/icon16.png",
+      "32": "assets/icon32.png"
+    },
     "default_title": "Private AI Chat Exporter"
   }
 }

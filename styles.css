@@ -1,17 +1,17 @@
 /* Styles for the export button */
 #private-md-export-btn {
   position: fixed;
-  right: 20px;
-  bottom: 20px;
+  right: 16px;
+  bottom: 84px;
   z-index: 10000;
-  padding: 10px 15px;
+  padding: 8px 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 999px;
   background: #10a37f;
   color: #fff;
   cursor: pointer;
   font-family: sans-serif;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   transition:
@@ -21,5 +21,14 @@
 
 #private-md-export-btn:hover {
   filter: brightness(1.1);
-  transform: scale(1.05);
+  transform: scale(1.03);
+}
+
+@media (max-width: 900px) {
+  #private-md-export-btn {
+    right: 12px;
+    bottom: 76px;
+    padding: 7px 10px;
+    font-size: 12px;
+  }
 }
