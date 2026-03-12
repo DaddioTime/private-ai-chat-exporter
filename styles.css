@@ -1,0 +1,6 @@
+/* Styles for Private Chat Exporter */
+#private-md-export-btn:hover {
+  filter: brightness(1.1);
+  transform: scale(1.05);
+  transition: all 0.2s ease;
+}

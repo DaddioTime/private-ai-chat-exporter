@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "Private Chat Exporter (Markdown)",
+  "version": "1.0",
+  "description": "Exportiere ChatGPT- und Gemini-Chats sicher und lokal als Markdown (.md). Keine Cloud-Anbindung.",
+  "permissions": ["storage"],
+  "content_scripts": [
+    {
+      "all_frames": false,
+      "matches": [
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["styles.css"],
+      "run_at": "document_end"
+    }
+  ],
+  "action": {
+    "default_title": "Private Chat Exporter"
+  }
+}
