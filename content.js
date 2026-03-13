@@ -121,7 +121,7 @@ function normalizeMarkdown(markdown) {
   return markdown
     .replace(/\r\n?/g, "\n")
     .replace(/[ \t]+\n/g, "\n")
-    .replace(/\n[ \t]+/g, "\n")
+    .replace(/\n[ \t]+\n/g, "\n\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
@@ -158,6 +158,254 @@ function stripUiArtifactLines(markdown) {
       );
     })
     .join("\n");
+}
+
+/**
+ * Returns whether a Markdown block is a single image.
+ * @param {string} block
+ * @returns {string}
+ */
+function getMarkdownImageUrl(block) {
+  const match = block
+    .trim()
+    .match(/^!\[[^\]]*\]\((https?:\/\/[^)]+)\)$/);
+
+  return match ? match[1] : "";
+}
+
+/**
+ * Returns whether a Markdown block is a short plain-text line.
+ * @param {string} block
+ * @returns {boolean}
+ */
+function isShortPlainMarkdownBlock(block) {
+  const text = block.trim();
+
+  return (
+    Boolean(text) &&
+    !text.includes("\n") &&
+    text.length <= 90 &&
+    !/^(#|>|- |\* |\d+\. |```|Sources: |\|)/.test(text)
+  );
+}
+
+/**
+ * Returns whether a Markdown block looks like a price.
+ * @param {string} block
+ * @returns {boolean}
+ */
+function isPriceMarkdownBlock(block) {
+  const text = block.trim();
+
+  return (
+    /^(CHF|EUR|USD|GBP|CAD|AUD)\s*\d/.test(text) ||
+    /^[$€£]\s*\d/.test(text) ||
+    /^\d[\d.,]*\s?(CHF|EUR|USD|GBP|CAD|AUD|[$€£])$/.test(text)
+  );
+}
+
+/**
+ * Returns whether a Markdown block looks like a vendor/source label.
+ * @param {string} block
+ * @returns {boolean}
+ */
+function isVendorMarkdownBlock(block) {
+  const text = block.trim();
+
+  return (
+    isShortPlainMarkdownBlock(text) &&
+    !isPriceMarkdownBlock(text) &&
+    !/^Sources: /.test(text)
+  );
+}
+
+/**
+ * Collapses remote result cards into a compact Markdown list.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function compactRemoteResultCards(markdown) {
+  const blocks = normalizeMarkdown(markdown).split("\n\n");
+  const compactedBlocks = [];
+
+  for (let index = 0; index < blocks.length; index++) {
+    const cardLines = [];
+
+    while (index < blocks.length) {
+      const imageUrl = getMarkdownImageUrl(blocks[index]);
+
+      if (!imageUrl || !imageUrl.includes("images.openai.com/thumbnails/url/")) {
+        break;
+      }
+
+      const titleBlock = blocks[index + 1];
+      if (!isShortPlainMarkdownBlock(titleBlock || "")) {
+        break;
+      }
+
+      let nextIndex = index + 2;
+      let priceBlock = "";
+      let vendorBlock = "";
+
+      if (isPriceMarkdownBlock(blocks[nextIndex] || "")) {
+        priceBlock = blocks[nextIndex].trim();
+        nextIndex++;
+      }
+
+      if ((blocks[nextIndex] || "").trim() === "•") {
+        nextIndex++;
+      }
+
+      if (isVendorMarkdownBlock(blocks[nextIndex] || "")) {
+        vendorBlock = blocks[nextIndex].trim();
+        nextIndex++;
+      }
+
+      if (!priceBlock && !vendorBlock) {
+        break;
+      }
+
+      const compactParts = [titleBlock.trim()];
+      if (priceBlock) {
+        compactParts.push(priceBlock);
+      }
+      if (vendorBlock) {
+        compactParts.push(vendorBlock);
+      }
+
+      cardLines.push(`- ${compactParts.join(" - ")}`);
+      index = nextIndex;
+    }
+
+    if (cardLines.length > 0) {
+      compactedBlocks.push(cardLines.join("\n"));
+      index -= 1;
+      continue;
+    }
+
+    compactedBlocks.push(blocks[index]);
+  }
+
+  return compactedBlocks.join("\n\n");
+}
+
+/**
+ * Removes isolated card-rating blocks that remain after card cleanup.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function removeStandaloneRatingBlocks(markdown) {
+  const blocks = normalizeMarkdown(markdown).split("\n\n");
+
+  return blocks
+    .filter((block, index) => {
+      const trimmedBlock = block.trim();
+      const previousBlock = (blocks[index - 1] || "").trim();
+      const nextBlock = (blocks[index + 1] || "").trim();
+
+      if (!/^\d([.,]\d+)?$/.test(trimmedBlock)) {
+        return true;
+      }
+
+      const ratingValue = Number(trimmedBlock.replace(",", "."));
+      if (Number.isNaN(ratingValue) || ratingValue < 0 || ratingValue > 5) {
+        return true;
+      }
+
+      const followsHeading = /^#{1,6}\s/.test(previousBlock);
+      const precedesStructuredContent =
+        /^\*\*/.test(nextBlock) ||
+        /^Sources: /.test(nextBlock) ||
+        /^[-*] /.test(nextBlock);
+
+      return !(followsHeading && precedesStructuredContent);
+    })
+    .join("\n\n");
+}
+
+/**
+ * Ensures inline source annotations are separated from preceding text.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function normalizeInlineSourcesSpacing(markdown) {
+  return markdown.replace(/(\S)(Sources:\s)/g, "$1 $2");
+}
+
+/**
+ * Indents sibling list items after a lead-in list item ending with a colon.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function indentLeadInListItems(markdown) {
+  const lines = markdown.split("\n");
+
+  for (let index = 0; index < lines.length; index++) {
+    const leadInMatch = lines[index].match(/^(\s*)([-*]|\d+\.)\s+.+:\s*$/);
+    if (!leadInMatch) {
+      continue;
+    }
+
+    const baseIndent = leadInMatch[1];
+    let nestedCount = 0;
+    let lineIndex = index + 1;
+
+    while (lineIndex < lines.length) {
+      const line = lines[lineIndex];
+
+      if (!line.trim()) {
+        break;
+      }
+
+      const listMatch = line.match(/^(\s*)([-*]|\d+\.)\s+/);
+      if (!listMatch || listMatch[1] !== baseIndent) {
+        break;
+      }
+
+      lines[lineIndex] = `  ${line}`;
+      nestedCount++;
+      lineIndex++;
+    }
+
+    if (nestedCount > 0) {
+      index = lineIndex - 1;
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Escapes prompt lines before they are wrapped into a blockquote.
+ * @param {string} markdown
+ * @returns {string}
+ */
+function normalizePromptMarkdown(markdown) {
+  return normalizeMarkdown(markdown)
+    .split("\n")
+    .map((line) => line.replace(/^(\s*)>\s?/, "$1\\> "))
+    .join("\n");
+}
+
+/**
+ * Applies message-specific Markdown cleanup.
+ * @param {"prompt" | "response"} roleType
+ * @param {string} markdown
+ * @returns {string}
+ */
+function postProcessMessageMarkdown(roleType, markdown) {
+  let processedMarkdown = normalizeMarkdown(markdown);
+
+  if (roleType === "prompt") {
+    return normalizePromptMarkdown(processedMarkdown);
+  }
+
+  processedMarkdown = compactRemoteResultCards(processedMarkdown);
+  processedMarkdown = removeStandaloneRatingBlocks(processedMarkdown);
+  processedMarkdown = indentLeadInListItems(processedMarkdown);
+  processedMarkdown = normalizeInlineSourcesSpacing(processedMarkdown);
+
+  return normalizeMarkdown(processedMarkdown);
 }
 
 /**
@@ -1064,7 +1312,10 @@ function findFirstMatchingElement(root, selectors) {
  * @returns {{ roleLabel: string, roleType: "prompt" | "response", markdown: string } | null}
  */
 function createExportMessage(roleLabel, roleType, html) {
-  const markdown = htmlToMarkdown(html).trim();
+  const markdown = postProcessMessageMarkdown(
+    roleType,
+    htmlToMarkdown(html).trim()
+  );
   if (!markdown) return null;
 
   return { roleLabel, roleType, markdown };

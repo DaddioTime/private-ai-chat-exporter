@@ -2,6 +2,27 @@
 
 All notable changes to this project should be documented in this file.
 
+## 1.3.1 - 2026-03-13
+
+### Fixed
+
+- Removed leftover standalone rating numbers from exported ChatGPT result-card sections.
+- Normalized inline `Sources:` spacing so source annotations no longer stick to the preceding sentence.
+
+## 1.3 - 2026-03-12
+
+### Changed
+
+- Compacted ChatGPT result cards into short Markdown list items instead of exporting large thumbnail blocks.
+- Improved prompt quoting so user-entered `>` lines are preserved as literal text inside the export.
+- Improved list post-processing so lead-in bullet points can keep nested sub-items readable in the final Markdown.
+
+### Fixed
+
+- Fixed a Markdown normalization issue that removed indentation and flattened nested lists.
+- Fixed readability regressions caused by ChatGPT product cards being exported too literally.
+- Fixed quoted prompt formatting for structured prompts with manual quote markers.
+
 ## 1.2 - 2026-03-12
 
 ### Added
