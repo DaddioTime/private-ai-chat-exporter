@@ -2,6 +2,24 @@
 
 All notable changes to this project should be documented in this file.
 
+## 1.3.2 - 2026-03-17
+
+### Changed
+
+- Redesigned extension icons.
+
+### Fixed
+
+- Blocked `javascript:`, `data:`, and other non-HTTP URL schemes from being included in exported Markdown links and images.
+- Fixed `sanitizeHref` catch clause so unparseable URLs are dropped instead of bypassing the protocol allowlist.
+- Fixed CommonMark-compliant backtick fencing for inline code spans that contain backtick characters, including consecutive backtick sequences.
+- Fixed `renderTable` so nested tables no longer merge their rows into the parent table output.
+- Fixed Markdown link and image labels so square brackets are escaped to prevent broken syntax.
+- Fixed `triggerDownload` to no longer modify the host page DOM unnecessarily.
+- Added error feedback to the export button when the export fails unexpectedly.
+- Optimized scroll container detection to walk message ancestors instead of querying all `<div>` elements on the page.
+- Corrected misleading JSDoc comment on `getMarkdownImageUrl`.
+
 ## 1.3.1 - 2026-03-13
 
 ### Fixed

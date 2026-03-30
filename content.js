@@ -8,6 +8,8 @@ const EXPORT_SEPARATOR = "\n\n---\n\n";
 const BUTTON_IDLE_LABEL = "⬇️ Markdown Export";
 const BUTTON_LOADING_LABEL = "Loading chat...";
 const BUTTON_EXPORTING_LABEL = "Exporting...";
+const BUTTON_ERROR_LABEL = "Export failed";
+const BUTTON_ERROR_DISPLAY_MS = 2000;
 const LOAD_WAIT_MS = 350;
 const LOAD_MAX_STEPS = 60;
 const LOAD_STABLE_ROUNDS = 4;
@@ -161,7 +163,7 @@ function stripUiArtifactLines(markdown) {
 }
 
 /**
- * Returns whether a Markdown block is a single image.
+ * Returns the image URL if the block is a single Markdown image, or empty string.
  * @param {string} block
  * @returns {string}
  */
@@ -409,6 +411,15 @@ function postProcessMessageMarkdown(roleType, markdown) {
 }
 
 /**
+ * Escapes square brackets in Markdown link and image labels.
+ * @param {string} label
+ * @returns {string}
+ */
+function escapeMarkdownLabel(label) {
+  return label.replace(/\[/g, "\\[").replace(/\]/g, "\\]");
+}
+
+/**
  * Returns a cleaned download/source URL.
  * @param {string | null} href
  * @returns {string}
@@ -418,6 +429,11 @@ function sanitizeHref(href) {
 
   try {
     const url = new URL(href, window.location.href);
+    const allowedProtocols = ["http:", "https:", "mailto:"];
+
+    if (!allowedProtocols.includes(url.protocol)) {
+      return "";
+    }
 
     Array.from(url.searchParams.keys()).forEach((key) => {
       if (key.startsWith("utm_")) {
@@ -427,7 +443,7 @@ function sanitizeHref(href) {
 
     return url.toString();
   } catch {
-    return href;
+    return "";
   }
 }
 
@@ -574,7 +590,7 @@ function renderSourceList(element) {
       }
 
       seenHrefs.add(href);
-      return `[${label}](${href})`;
+      return `[${escapeMarkdownLabel(label)}](${href})`;
     })
     .filter(Boolean);
 
@@ -606,8 +622,15 @@ function renderInlineCode(text) {
   const code = text.replace(/\u00a0/g, " ").trim();
   if (!code) return "";
 
-  const fence = code.includes("`") ? "``" : "`";
-  return `${fence}${code}${fence}`;
+  if (!code.includes("`")) {
+    return `\`${code}\``;
+  }
+
+  const runs = code.match(/`+/g) || [];
+  const maxRun = Math.max(...runs.map((run) => run.length));
+  const fence = "`".repeat(maxRun + 1);
+
+  return `${fence} ${code} ${fence}`;
 }
 
 /**
@@ -616,7 +639,7 @@ function renderInlineCode(text) {
  * @returns {string}
  */
 function renderTable(table) {
-  const rowElements = Array.from(table.querySelectorAll("tr"));
+  const rowElements = Array.from(table.querySelectorAll(":scope > tr, :scope > thead > tr, :scope > tbody > tr, :scope > tfoot > tr"));
   if (rowElements.length === 0) return "";
 
   const rows = rowElements
@@ -713,12 +736,12 @@ function renderInlineNode(node) {
         normalizeText(renderInlineNodes(Array.from(element.childNodes))).trim() ||
         href;
 
-      return href ? `[${label}](${href})` : label;
+      return href ? `[${escapeMarkdownLabel(label)}](${href})` : label;
     }
     case "IMG": {
       const src = sanitizeHref(element.getAttribute("src"));
       const alt = normalizeText(element.getAttribute("alt") || "").trim() || "Image";
-      return src ? `![${alt}](${src})` : alt;
+      return src ? `![${escapeMarkdownLabel(alt)}](${src})` : alt;
     }
     default:
       return isBlockNode(element)
@@ -910,10 +933,8 @@ function triggerDownload(content, filename) {
 
   link.href = url;
   link.download = filename;
-
-  document.body.appendChild(link);
   link.click();
-  document.body.removeChild(link);
+
   URL.revokeObjectURL(url);
 }
 
@@ -1088,13 +1109,26 @@ function findConversationScrollContainer(platform) {
 
   candidates.add(defaultContainer);
 
-  ["main", "section", "article", "div"].forEach((selector) => {
-    document.querySelectorAll(selector).forEach((element) => {
-      if (isScrollableElement(element)) {
-        candidates.add(element);
+  messageElements.forEach((element) => {
+    let ancestor = element.parentElement;
+
+    while (ancestor && ancestor !== document.documentElement) {
+      if (isScrollableElement(ancestor)) {
+        candidates.add(ancestor);
       }
-    });
+      ancestor = ancestor.parentElement;
+    }
   });
+
+  if (candidates.size <= 1) {
+    ["main", "section", "article"].forEach((selector) => {
+      document.querySelectorAll(selector).forEach((element) => {
+        if (isScrollableElement(element)) {
+          candidates.add(element);
+        }
+      });
+    });
+  }
 
   let bestContainer = defaultContainer;
   let bestScore = Number.NEGATIVE_INFINITY;
@@ -1519,6 +1553,10 @@ async function startExport() {
       result.markdown,
       `chat-export-${platformName}-${timestamp}.md`
     );
+  } catch (error) {
+    console.error("[Private AI Chat Exporter]", error);
+    setExportButtonState(BUTTON_ERROR_LABEL, true);
+    await sleep(BUTTON_ERROR_DISPLAY_MS);
   } finally {
     if (loadedConversation) {
       restoreScrollState(
